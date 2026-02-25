@@ -697,9 +697,9 @@ DATABASE_URL="postgresql://appuser:YourStrongPassword123@27.0.0.1:5433/directory
 ```
 ---
 
-Note: Port is 5433 (tunnel port), not 5432
+## Note: Port is 5433 (tunnel port), not 5432
 
-With Connection Pooling (Recommended for Production)
+### With Connection Pooling (Recommended for Production)
 
 ```env
 DATABASE_URL="postgresql://appuser:YourStrongPassword123@localhost:5432/directory_db?schema=public&connection_limit=20&pool_timeout=30"
