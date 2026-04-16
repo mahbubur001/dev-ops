@@ -12,4 +12,4 @@ A collection of DevOps guides and instructions.
 ├── deploy.sh             ← deployment script
 └── health-check.sh       ← server health check
 
-- [Server Management Scripts](Instructions/postgresql-auto-backup-guide.md)
+- [Server Management Scripts](Instructions/server-management-scripts.md)
