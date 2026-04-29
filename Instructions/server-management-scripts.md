@@ -589,7 +589,7 @@ fi
 # ── Config (defaults — override via /etc/security-check.env) ──
 ALERT_EMAIL="${ALERT_EMAIL:-mahbubur001@gmail.com}"
 RESEND_API_KEY="${RESEND_API_KEY:-}"
-RESEND_FROM="${RESEND_FROM:-security@radiusdirectory.com}"
+RESEND_FROM="${RESEND_FROM:-onboarding@resend.dev}"
 SERVER_NAME="${SERVER_NAME:-AWS EC2}"
 SERVER_IP="${SERVER_IP:-13.202.89.114}"
 LOG_FILE="/var/log/security-check.log"
