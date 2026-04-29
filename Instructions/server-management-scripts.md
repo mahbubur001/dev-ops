@@ -1119,6 +1119,21 @@ sudo crontab -e
 
 ---
 
+```bash
+sudo bash -c 'cat > /etc/security-check.env <<EOF
+ALERT_EMAIL=mahbubur001@gmail.com
+RESEND_API_KEY=re_your_NEW_key_here
+RESEND_FROM=onboarding@resend.dev
+SERVER_NAME=AWS EC2
+SERVER_IP=13.202.89.114
+EOF'
+
+sudo chmod 600 /etc/security-check.env
+sudo chown root:root /etc/security-check.env
+
+sudo cat -A /etc/security-check.env
+```
+
 ## Log Files
 
 | Log | Location |
