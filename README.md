@@ -17,9 +17,9 @@
 
 | Resource | Details |
 |---|---|
-| **Hetzner Server** | `87.99.130.89` — Ubuntu 24, 4 vCPU / 16GB RAM |
+| **Hetzner Server** | Ubuntu 24, 4 vCPU / 16GB RAM |
 | **AWS EC2** | `t3.medium` — Ubuntu 24.04, 30GB Storage |
-| **Database** | PostgreSQL 17 |
+| **Database** | PostgreSQL 18 |
 | **Hetzner DB** | `bikribd` / user `bikribdu` |
 
 ---
@@ -78,7 +78,7 @@ sudo /usr/local/bin/health-check.sh
 sudo /usr/local/bin/pg-backup.sh
 
 # SSH tunnel (local port 5433 → remote 5432)
-ssh -L 5433:localhost:5432 deploy@87.99.130.89 -N -C
+ssh -L 5433:localhost:5432 deploy@<hetzner-ip> -N -C
 
 # View firewall rules
 sudo ufw status
@@ -86,4 +86,4 @@ sudo ufw status
 
 ---
 
-> **Server:** Hetzner `87.99.130.89` &nbsp;|&nbsp; **DB Port:** `5432` &nbsp;|&nbsp; **Maintained by:** Mahbubur Rahman
+> **Server:** Hetzner `<your-server-ip>` &nbsp;|&nbsp; **DB Port:** `5432` &nbsp;|&nbsp; **Maintained by:** Mahbubur Rahman

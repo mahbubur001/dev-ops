@@ -95,7 +95,7 @@ sudo /usr/local/bin/backup-postgres.sh
 
 ```
 Tue Jan 15 02:00:01 UTC 2025: Starting backup of directory_db...
-Tue Jan 15 02:00:05 UTC 2025: ✅ Backup successful: /var/backups/postgresql/directory_db_20250115_020001.sql.gz (2.5M)
+Tue Jan 15 02:00:05 UTC 2025: ✅ Backup successful: /var/backups/postgresql/directory_db_20260101_020001.sql.gz (2.5M)
 Tue Jan 15 02:00:05 UTC 2025: Cleaning up backups older than 7 days...
 Tue Jan 15 02:00:05 UTC 2025: Backup process completed.
 ```
@@ -124,10 +124,13 @@ sudo crontab -l
 
 ## Method 2: Backup to AWS S3 (Recommended)
 
-### Step 1: Install AWS CLI
+### Step 1: Install AWS CLI v2
 
 ```bash
-sudo apt install awscli -y
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+aws --version
 ```
 
 ### Step 2: Configure AWS CLI
@@ -381,7 +384,7 @@ aws s3 ls s3://your-app-db-backups/daily/
 # Stop your application first (optional but recommended)
 
 # Restore to existing database
-gunzip -c /var/backups/postgresql/directory_db_20250115_020001.sql.gz | psql -U appuser -h localhost -d directory_db
+gunzip -c /var/backups/postgresql/directory_db_20260101_020001.sql.gz | psql -U appuser -h localhost -d directory_db
 ```
 
 ### Restore to New Database
@@ -392,7 +395,7 @@ sudo -u postgres psql -c "CREATE DATABASE directory_db_restored;"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE directory_db_restored TO appuser;"
 
 # Restore
-gunzip -c /var/backups/postgresql/directory_db_20250115_020001.sql.gz | psql -U appuser -h localhost -d directory_db_restored
+gunzip -c /var/backups/postgresql/directory_db_20260101_020001.sql.gz | psql -U appuser -h localhost -d directory_db_restored
 
 # Verify
 psql -U appuser -h localhost -d directory_db_restored -c "\dt"
@@ -402,10 +405,10 @@ psql -U appuser -h localhost -d directory_db_restored -c "\dt"
 
 ```bash
 # Download from S3
-aws s3 cp s3://your-app-db-backups/daily/directory_db_20250115_020001.sql.gz /tmp/
+aws s3 cp s3://your-app-db-backups/daily/directory_db_20260101_020001.sql.gz /tmp/
 
 # Restore
-gunzip -c /tmp/directory_db_20250115_020001.sql.gz | psql -U appuser -h localhost -d directory_db
+gunzip -c /tmp/directory_db_20260101_020001.sql.gz | psql -U appuser -h localhost -d directory_db
 ```
 
 ### Test Restore (Recommended Practice)
@@ -666,7 +669,7 @@ Your PostgreSQL database will now be backed up automatically every day at 2:00 A
 
 ---
 
-*Document Version: 1.0*
-*PostgreSQL Version: 17*
+*Document Version: 2.0*
+*PostgreSQL Version: 18*
 *Ubuntu Version: 24.04 LTS*
-*Last Updated: 2024*
+*Last Updated: 2026*

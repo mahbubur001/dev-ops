@@ -1,1 +1,1 @@
-mem:2026-06-24T02:44Z branch:main open:none commits:05e40d5:Update PostgreSQL installation guide from v17 to v18|d4199c5:Redesign README with modern structured format|80a580f:Add CLAUDE.md, PostgreSQL remote access guide, and update README index corrections:none decisions:none
+mem:2026-06-24T02:46Z branch:main open:none commits:8f9563e:Add back-to-home navigation link to all instruction pages|05e40d5:Update PostgreSQL installation guide from v17 to v18|d4199c5:Redesign README with modern structured format corrections:none decisions:none

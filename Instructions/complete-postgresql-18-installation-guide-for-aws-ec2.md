@@ -65,11 +65,9 @@ sudo rm -rf /etc/postgresql/
 ## Step 4: Install PostgreSQL 18
 
 ```bash
-# Add PostgreSQL official repository
-sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-
 # Import repository signing key
-wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc > /dev/null
+sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
 
 # Update package list
 sudo apt update
@@ -535,19 +533,6 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE directory_db TO appus
 sudo -u postgres psql -c "CREATE USER appuser WITH PASSWORD 'YourPassword';"
 ```
 
-### Import Error: Unrecognized Parameter
-
-If importing from older PostgreSQL version:
-
-```bash
-# Remove problematic lines
-sed -i '/transaction_timeout/d' /home/ubuntu/backup.sql
-sed -i '/idle_session_timeout/d' /home/ubuntu/backup.sql
-
-# Then import again
-psql -U appuser -d directory_db -h localhost -f /home/ubuntu/backup.sql
-```
-
 ### Import Error: Table Already Exists
 
 ```bash
@@ -579,7 +564,7 @@ sudo -u postgres psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
 
 ---
 
-## PostgreSQL 17 File Paths
+## PostgreSQL 18 File Paths
 
 | Item | Path |
 |------|------|
@@ -659,7 +644,7 @@ psql -U appuser -d directory_db -h localhost -c "\dt"
 
 - [ ] Connected to EC2 instance
 - [ ] System updated
-- [ ] PostgreSQL 17 installed
+- [ ] PostgreSQL 18 installed
 - [ ] Database created
 - [ ] User created with password
 - [ ] Permissions granted
