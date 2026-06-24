@@ -8,6 +8,7 @@
 
 - [Infrastructure Overview](#-infrastructure-overview)
 - [PostgreSQL Guides](#-postgresql-guides)
+- [File Transfer](#-file-transfer)
 - [Server Management](#-server-management)
 - [Quick Reference](#-quick-reference)
 
@@ -32,6 +33,12 @@
 |---|---|---|
 | [PostgreSQL 18 Installation](Instructions/complete-postgresql-18-installation-guide-for-aws-ec2.md) | AWS EC2 | Full install — system setup, DB creation, config, import, backup |
 
+### Migration
+
+| Guide | Description |
+|---|---|
+| [Migrate Database — Server to Server](Instructions/postgresql-migrate-server-to-server.md) | Dump & restore, direct stream, full cluster migration, verification steps |
+
 ### Backup & Recovery
 
 | Guide | Description |
@@ -43,6 +50,14 @@
 | Guide | Description |
 |---|---|
 | [Remote Access — Hetzner](Instructions/postgresql-remote-access-hetzner.md) | IP allowlist via `pg_hba.conf` + UFW, SSH tunnel fallback, status checks |
+
+---
+
+## 📁 File Transfer
+
+| Guide | Description |
+|---|---|
+| [Upload Files & Folders to Server](Instructions/upload-files-to-server.md) | SCP, Rsync, SFTP — single files, folders, project deploys, excludes |
 
 ---
 
