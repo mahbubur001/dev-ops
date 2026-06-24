@@ -1,3 +1,5 @@
+[← Back to Home](../README.md)
+
 # Complete PostgreSQL 18 Installation Guide for AWS EC2
 
 > **Instance:** t3.medium | **OS:** Ubuntu Server 24.04 | **Storage:** 30GB

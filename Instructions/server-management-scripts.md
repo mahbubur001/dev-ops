@@ -1,3 +1,5 @@
+[← Back to Home](../README.md)
+
 # Server Management Scripts
 > Hetzner Server: `87.99.130.89` | Ubuntu 24 | 4 vCPU / 16GB RAM
 

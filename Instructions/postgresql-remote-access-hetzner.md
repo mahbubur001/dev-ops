@@ -1,3 +1,5 @@
+[← Back to Home](../README.md)
+
 # PostgreSQL Remote Access Setup — Hetzner Server
 
 ## Server Details

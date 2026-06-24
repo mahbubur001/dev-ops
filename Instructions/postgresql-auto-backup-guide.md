@@ -1,3 +1,5 @@
+[← Back to Home](../README.md)
+
 # Auto Backup PostgreSQL on AWS EC2 (Daily)
 
 > Complete guide to set up automatic daily backups for your PostgreSQL database on AWS EC2.
