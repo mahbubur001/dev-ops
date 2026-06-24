@@ -10,7 +10,7 @@ This is a documentation-only DevOps knowledge base — no application code, no b
 
 - **Primary server:** Hetzner (`87.99.130.89`) — Ubuntu 24, 4 vCPU / 16GB RAM
 - **Secondary:** AWS EC2 (`t3.medium`, Ubuntu 24.04, 30GB)
-- **Database:** PostgreSQL 17
+- **Database:** PostgreSQL 18
 - **Hetzner DB:** `bikribd` / user `bikribdu`
 - **Scripts live on server at:** `/usr/local/bin/`
 

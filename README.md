@@ -30,7 +30,7 @@
 
 | Guide | Platform | Description |
 |---|---|---|
-| [PostgreSQL 17 Installation](Instructions/complete-postgresql-17-installation-guide-for-aws-ec2.md) | AWS EC2 | Full install — system setup, DB creation, config, import, backup |
+| [PostgreSQL 18 Installation](Instructions/complete-postgresql-18-installation-guide-for-aws-ec2.md) | AWS EC2 | Full install — system setup, DB creation, config, import, backup |
 
 ### Backup & Recovery
 

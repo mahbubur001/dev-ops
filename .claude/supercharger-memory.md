@@ -1,0 +1,1 @@
+mem:2026-06-24T02:40Z branch:main open:.claude/supercharger-memory.md commits:d4199c5:Redesign README with modern structured format|80a580f:Add CLAUDE.md, PostgreSQL remote access guide, and update README index|b4299e8:Update server script to create database and user using script corrections:none decisions:none

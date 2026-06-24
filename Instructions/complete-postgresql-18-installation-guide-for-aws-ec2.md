@@ -1,4 +1,4 @@
-# Complete PostgreSQL 17 Installation Guide for AWS EC2
+# Complete PostgreSQL 18 Installation Guide for AWS EC2
 
 > **Instance:** t3.medium | **OS:** Ubuntu Server 24.04 | **Storage:** 30GB
 
@@ -9,7 +9,7 @@
 1. [Connect to EC2 Instance](#step-1-connect-to-your-ec2-instance)
 2. [Update System](#step-2-update-system)
 3. [Remove Old PostgreSQL (If Exists)](#step-3-remove-old-postgresql-if-exists)
-4. [Install PostgreSQL 17](#step-4-install-postgresql-17)
+4. [Install PostgreSQL 18](#step-4-install-postgresql-18)
 5. [Verify Installation](#step-5-verify-postgresql-is-running)
 6. [Create Database and User](#step-6-create-database-and-user)
 7. [Configure PostgreSQL](#step-7-configure-postgresql)
@@ -60,7 +60,7 @@ sudo rm -rf /etc/postgresql/
 
 ---
 
-## Step 4: Install PostgreSQL 17
+## Step 4: Install PostgreSQL 18
 
 ```bash
 # Add PostgreSQL official repository
@@ -73,10 +73,10 @@ wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee 
 sudo apt update
 
 # Check available versions
-apt-cache search postgresql | grep postgresql-17
+apt-cache search postgresql | grep postgresql-18
 
-# Install PostgreSQL 17
-sudo apt install -y postgresql-17 postgresql-contrib-17
+# Install PostgreSQL 18
+sudo apt install -y postgresql-18 postgresql-contrib-18
 
 # Verify installation
 psql --version
@@ -85,7 +85,7 @@ psql --version
 **Expected output:**
 
 ```
-psql (PostgreSQL) 17.x
+psql (PostgreSQL) 18.x
 ```
 
 ---
@@ -163,7 +163,7 @@ exit
 ### 7.1 Edit Main Configuration
 
 ```bash
-sudo nano /etc/postgresql/17/main/postgresql.conf
+sudo nano /etc/postgresql/18/main/postgresql.conf
 ```
 
 **Find and update these settings:**
@@ -205,7 +205,7 @@ log_min_duration_statement = 1000
 ### 7.2 Edit Authentication Configuration
 
 ```bash
-sudo nano /etc/postgresql/17/main/pg_hba.conf
+sudo nano /etc/postgresql/18/main/pg_hba.conf
 ```
 
 **Find and update to match:**
@@ -356,7 +356,7 @@ sudo nano /usr/local/bin/backup-postgres.sh
 #!/bin/bash
 
 #####################################
-# PostgreSQL 17 Backup Script
+# PostgreSQL 18 Backup Script
 #####################################
 
 BACKUP_DIR="/var/backups/postgresql"
@@ -479,7 +479,7 @@ DATABASE_URL="postgresql://appuser:YourStrongPassword123@localhost:5432/director
 
 | Task | Command |
 |------|---------|
-| View logs | `sudo tail -f /var/log/postgresql/postgresql-17-main.log` |
+| View logs | `sudo tail -f /var/log/postgresql/postgresql-18-main.log` |
 | View backup log | `sudo tail -f /var/log/postgres-backup.log` |
 
 ---
@@ -581,11 +581,11 @@ sudo -u postgres psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
 
 | Item | Path |
 |------|------|
-| Main config | `/etc/postgresql/17/main/postgresql.conf` |
-| Auth config | `/etc/postgresql/17/main/pg_hba.conf` |
-| Data directory | `/var/lib/postgresql/17/main/` |
+| Main config | `/etc/postgresql/18/main/postgresql.conf` |
+| Auth config | `/etc/postgresql/18/main/pg_hba.conf` |
+| Data directory | `/var/lib/postgresql/18/main/` |
 | Log directory | `/var/log/postgresql/` |
-| Binary files | `/usr/lib/postgresql/17/bin/` |
+| Binary files | `/usr/lib/postgresql/18/bin/` |
 | Backup directory | `/var/backups/postgresql/` |
 
 ---
@@ -624,7 +624,7 @@ sudo -u postgres psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
 
 5. **Monitor logs**
    ```bash
-   sudo tail -f /var/log/postgresql/postgresql-17-main.log
+   sudo tail -f /var/log/postgresql/postgresql-18-main.log
    ```
 
 ---
@@ -674,7 +674,7 @@ psql -U appuser -d directory_db -h localhost -c "\dt"
 
 ## Done! ✅
 
-Your PostgreSQL 17 database is now installed, configured, and your data is imported.
+Your PostgreSQL 18 database is now installed, configured, and your data is imported.
 
 **Connection String:**
 
@@ -706,7 +706,7 @@ DATABASE_URL="postgresql://appuser:YourStrongPassword123@localhost:5432/director
 ```
 ---
 
-*Document Version: 1.0*
-*PostgreSQL Version: 17*
+*Document Version: 2.0*
+*PostgreSQL Version: 18*
 *Ubuntu Version: 24.04 LTS*
-*Last Updated: 2024*
+*Last Updated: 2026*
