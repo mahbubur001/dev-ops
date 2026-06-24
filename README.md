@@ -13,3 +13,4 @@ A collection of DevOps guides and instructions.
 └── health-check.sh       ← server health check
 
 - [Server Management Scripts](Instructions/server-management-scripts.md)
+- [PostgreSQL Remote Access Setup — Hetzner](Instructions/postgresql-remote-access-hetzner.md)
