@@ -8,19 +8,19 @@
 ## Quick Setup
 
 ```bash
-# Create all five scripts
+# Create all six scripts
 sudo vim /usr/local/bin/pg-backup.sh
 sudo vim /usr/local/bin/pg-restore.sh
 sudo vim /usr/local/bin/pg-create-db.sh
+sudo vim /usr/local/bin/pg-drop-db.sh
 sudo vim /usr/local/bin/health-check.sh
 sudo vim /usr/local/bin/security-check.sh
 
-# Make all executable
-sudo chmod +x /usr/local/bin/pg-backup.sh
-sudo chmod +x /usr/local/bin/pg-restore.sh
-sudo chmod +x /usr/local/bin/pg-create-db.sh
-sudo chmod +x /usr/local/bin/health-check.sh
-sudo chmod +x /usr/local/bin/security-check.sh
+# Optional: one launcher menu for all scripts
+sudo vim /usr/local/bin/pg-manage.sh
+
+# Make all executable (one command)
+sudo chmod +x /usr/local/bin/{pg-backup,pg-restore,pg-create-db,pg-drop-db,health-check,security-check,pg-manage}.sh
 ```
 
 ---
@@ -687,7 +687,301 @@ PGPASSWORD='MyP@ssw0rd' psql -U bikri_user -d bikri_staging -h localhost
 
 ---
 
-## 4. health-check.sh — Server Health Monitor
+## 4. pg-drop-db.sh — Database & User Deletion Tool
+
+**Location:** `/usr/local/bin/pg-drop-db.sh`
+
+> ⚠️ **Destructive.** Dropping a database is irreversible. The script forces a safety backup by default and requires you to type the database name to confirm.
+
+```bash
+#!/bin/bash
+
+# ── Colors ────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# ── Config ────────────────────────────────────────────────
+LOG_FILE="/var/log/pg-drop-db.log"
+BACKUP_DIR="/var/backups/postgresql/pre-drop"
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+
+# ── Help ──────────────────────────────────────────────────
+show_help() {
+  echo -e "${BLUE}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  PostgreSQL Database & User Dropper"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo -e "${NC}"
+  echo "Usage:"
+  echo "  sudo pg-drop-db.sh -d DATABASE [-r USERNAME] [-n] [-f]"
+  echo ""
+  echo "Options:"
+  echo "  -d    Database name to drop"
+  echo "  -r    Also drop this role/user after dropping the database"
+  echo "  -n    No backup (skip the safety dump — not recommended)"
+  echo "  -f    Force: terminate active connections before dropping"
+  echo "  -h    Show this help"
+  echo ""
+  echo "Examples:"
+  echo "  # Interactive mode"
+  echo "  sudo pg-drop-db.sh"
+  echo ""
+  echo "  # Drop a database (safety backup taken first)"
+  echo "  sudo pg-drop-db.sh -d myapp_staging"
+  echo ""
+  echo "  # Drop database + its owner, terminating open connections"
+  echo "  sudo pg-drop-db.sh -d myapp_staging -r myapp_user -f"
+}
+
+# ── Validate input ────────────────────────────────────────
+validate_input() {
+  local INPUT=$1
+  local TYPE=$2
+
+  if [ -z "$INPUT" ]; then
+    echo -e "${RED}❌ $TYPE cannot be empty${NC}"
+    return 1
+  fi
+
+  if [[ ! "$INPUT" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    echo -e "${RED}❌ $TYPE can only contain letters, numbers, underscore, and hyphen${NC}"
+    return 1
+  fi
+
+  return 0
+}
+
+# ── Guard against system databases ────────────────────────
+is_protected_db() {
+  case "$1" in
+    postgres|template0|template1) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# ── Check if database exists ──────────────────────────────
+check_database_exists() {
+  local DB=$1
+  sudo -u postgres psql -lqt 2>/dev/null | cut -d \| -f 1 | grep -qw "$DB"
+  return $?
+}
+
+# ── Check if user exists ──────────────────────────────────
+check_user_exists() {
+  local USER=$1
+  sudo -u postgres psql -t -c "SELECT 1 FROM pg_roles WHERE rolname='$USER'" 2>/dev/null | grep -q 1
+  return $?
+}
+
+# ── Drop database (and optionally the role) ───────────────
+drop_database_and_user() {
+  local DB=$1
+  local ROLE=$2
+  local NO_BACKUP=$3
+  local FORCE=$4
+
+  echo -e "${BLUE}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  Dropping Database"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo -e "${NC}"
+
+  if is_protected_db "$DB"; then
+    echo -e "${RED}❌ '$DB' is a system database and cannot be dropped${NC}"
+    echo "[$DATE] ❌ Refused to drop protected database: $DB" >> "$LOG_FILE"
+    exit 1
+  fi
+
+  if ! check_database_exists "$DB"; then
+    echo -e "${RED}❌ Database '$DB' does not exist${NC}"
+    echo "[$DATE] ❌ Drop failed: $DB does not exist" >> "$LOG_FILE"
+    exit 1
+  fi
+
+  echo -e "  Database : ${RED}$DB${NC}"
+  [ -n "$ROLE" ] && echo -e "  Role     : ${RED}$ROLE${NC} (will also be dropped)"
+  if [ "$NO_BACKUP" = true ]; then
+    echo -e "  Backup   : ${RED}SKIPPED${NC}"
+  else
+    echo -e "  Backup   : ${GREEN}$BACKUP_DIR/${DB}_${DATE}.sql.gz${NC}"
+  fi
+  echo ""
+  echo -e "${YELLOW}This action is IRREVERSIBLE.${NC}"
+  read -p "Type the database name '$DB' to confirm: " CONFIRM
+
+  if [ "$CONFIRM" != "$DB" ]; then
+    echo -e "${YELLOW}❌ Name did not match. Drop cancelled.${NC}"
+    exit 0
+  fi
+
+  # Safety backup
+  if [ "$NO_BACKUP" != true ]; then
+    echo -e "${BLUE}🔄 Backing up before drop...${NC}"
+    mkdir -p "$BACKUP_DIR"
+    sudo -u postgres pg_dump "$DB" 2>/dev/null | gzip > "$BACKUP_DIR/${DB}_${DATE}.sql.gz"
+    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+      echo -e "${GREEN}✅ Backup saved: $BACKUP_DIR/${DB}_${DATE}.sql.gz${NC}"
+    else
+      echo -e "${RED}❌ Backup failed — aborting drop${NC}"
+      echo "[$DATE] ❌ Pre-drop backup failed: $DB" >> "$LOG_FILE"
+      rm -f "$BACKUP_DIR/${DB}_${DATE}.sql.gz"
+      exit 1
+    fi
+  fi
+
+  # Terminate active connections if forced
+  if [ "$FORCE" = true ]; then
+    echo -e "${BLUE}🔄 Terminating active connections...${NC}"
+    sudo -u postgres psql -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$DB' AND pid <> pg_backend_pid();" >/dev/null 2>&1
+  fi
+
+  echo -e "${BLUE}🔄 Dropping database...${NC}"
+  sudo -u postgres psql -c "DROP DATABASE \"$DB\";" 2>/tmp/pg-drop-err
+  if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ Database '$DB' dropped${NC}"
+    echo "[$DATE] ✅ Database dropped: $DB" >> "$LOG_FILE"
+  else
+    echo -e "${RED}❌ Drop failed:${NC}"
+    cat /tmp/pg-drop-err
+    if grep -q "being accessed by other users" /tmp/pg-drop-err; then
+      echo -e "${YELLOW}💡 Active connections exist. Re-run with -f to terminate them.${NC}"
+    fi
+    echo "[$DATE] ❌ Drop failed: $DB" >> "$LOG_FILE"
+    rm -f /tmp/pg-drop-err
+    exit 1
+  fi
+  rm -f /tmp/pg-drop-err
+
+  # Drop role if requested
+  if [ -n "$ROLE" ]; then
+    if check_user_exists "$ROLE"; then
+      echo -e "${BLUE}🔄 Dropping role '$ROLE'...${NC}"
+      sudo -u postgres psql -c "DROP ROLE \"$ROLE\";" 2>/tmp/pg-drop-err
+      if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ Role '$ROLE' dropped${NC}"
+        echo "[$DATE] ✅ Role dropped: $ROLE" >> "$LOG_FILE"
+      else
+        echo -e "${YELLOW}⚠️  Could not drop role '$ROLE' (it may own objects in other databases):${NC}"
+        cat /tmp/pg-drop-err
+        echo "[$DATE] ⚠️ Role drop failed: $ROLE" >> "$LOG_FILE"
+      fi
+      rm -f /tmp/pg-drop-err
+    else
+      echo -e "${YELLOW}ℹ️  Role '$ROLE' does not exist — nothing to drop${NC}"
+    fi
+  fi
+
+  echo ""
+  echo -e "${GREEN}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  ✅ Done"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo -e "${NC}"
+  [ "$NO_BACKUP" != true ] && echo -e "  Restore with: ${YELLOW}gunzip -c $BACKUP_DIR/${DB}_${DATE}.sql.gz | sudo -u postgres psql -d NEWDB${NC}"
+}
+
+# ── Interactive mode ──────────────────────────────────────
+interactive_mode() {
+  echo -e "${BLUE}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  PostgreSQL Database & User Dropper"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo -e "${NC}"
+
+  while true; do
+    read -p "Enter database name to drop: " DB
+    if validate_input "$DB" "Database name"; then
+      break
+    fi
+  done
+
+  read -p "Also drop the owning role/user? Enter name (blank to skip): " ROLE
+  if [ -n "$ROLE" ] && ! validate_input "$ROLE" "Username"; then
+    exit 1
+  fi
+
+  read -p "Terminate active connections if needed? (yes/no): " F
+  [ "$F" = "yes" ] && FORCE=true || FORCE=false
+
+  drop_database_and_user "$DB" "$ROLE" false "$FORCE"
+}
+
+# ── Parse args ────────────────────────────────────────────
+DB=""
+ROLE=""
+NO_BACKUP=false
+FORCE=false
+
+while getopts "d:r:nfh" opt; do
+  case $opt in
+    d) DB="$OPTARG" ;;
+    r) ROLE="$OPTARG" ;;
+    n) NO_BACKUP=true ;;
+    f) FORCE=true ;;
+    h) show_help; exit 0 ;;
+    *) show_help; exit 1 ;;
+  esac
+done
+
+# ── Main ──────────────────────────────────────────────────
+if [ -z "$DB" ] && [ -z "$ROLE" ]; then
+  interactive_mode
+elif [ -n "$DB" ]; then
+  if ! validate_input "$DB" "Database name"; then exit 1; fi
+  if [ -n "$ROLE" ] && ! validate_input "$ROLE" "Username"; then exit 1; fi
+  drop_database_and_user "$DB" "$ROLE" "$NO_BACKUP" "$FORCE"
+else
+  echo -e "${RED}❌ Error: Database (-d) is required${NC}"
+  echo ""
+  show_help
+  exit 1
+fi
+```
+
+### Usage
+
+```bash
+# Interactive mode (recommended)
+sudo pg-drop-db.sh
+
+# Drop a database — safety backup taken automatically
+sudo pg-drop-db.sh -d myapp_staging
+
+# Drop database + its owner role, terminating open connections
+sudo pg-drop-db.sh -d myapp_staging -r myapp_user -f
+
+# Drop without a backup (fast, unsafe)
+sudo pg-drop-db.sh -d myapp_dev -n
+```
+
+### Features
+
+- ✅ Interactive and flag-based modes
+- ✅ Forces a compressed safety backup to `/var/backups/postgresql/pre-drop/` (skip with `-n`)
+- ✅ Requires typing the exact database name to confirm
+- ✅ Refuses to drop system databases (`postgres`, `template0`, `template1`)
+- ✅ `-f` terminates active connections (fixes "database is being accessed by other users")
+- ✅ Optional owner-role cleanup with `-r`
+- ✅ Aborts the drop if the safety backup fails
+- ✅ Logging to `/var/log/pg-drop-db.log`
+
+### What it does
+
+1. Validates the database name and guards against system databases
+2. Confirms the database exists
+3. Requires you to retype the database name
+4. Takes a compressed `pg_dump` backup (unless `-n`) — aborts if it fails
+5. Optionally terminates active connections (`-f`)
+6. Runs `DROP DATABASE`
+7. Optionally drops the owning role (`-r`)
+8. Prints the restore command for the safety backup
+
+---
+
+## 5. health-check.sh — Server Health Monitor
 
 **Location:** `/usr/local/bin/health-check.sh`
 
@@ -945,7 +1239,7 @@ sudo health-check.sh
 
 ---
 
-## 5. security-check.sh — Security Monitor with Email Alerts
+## 6. security-check.sh — Security Monitor with Email Alerts
 
 **Location:** `/usr/local/bin/security-check.sh`
 
@@ -1485,6 +1779,118 @@ tail -50 /var/log/security-check.log
 
 ---
 
+## 7. pg-manage.sh — Interactive Menu Launcher
+
+**Location:** `/usr/local/bin/pg-manage.sh`
+
+One entry point for every script above. Run `sudo pg-manage.sh` and pick an action from a colored menu — no need to remember individual script names or flags. Pure bash (no extra packages), so it works over any SSH session.
+
+```bash
+#!/bin/bash
+
+# ── Colors ────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+BIN="/usr/local/bin"
+
+# ── Require root ──────────────────────────────────────────
+if [ "$EUID" -ne 0 ]; then
+  echo -e "${RED}❌ Please run with sudo:${NC} sudo pg-manage.sh"
+  exit 1
+fi
+
+# ── Status line (shown in the header) ─────────────────────
+pg_status() {
+  if systemctl is-active --quiet postgresql; then
+    echo -e "${GREEN}● running${NC}"
+  else
+    echo -e "${RED}● stopped${NC}"
+  fi
+}
+
+# ── Draw the menu ─────────────────────────────────────────
+draw_menu() {
+  clear
+  echo -e "${BLUE}${BOLD}"
+  echo "╔══════════════════════════════════════════════╗"
+  echo "║              PostgreSQL Manager              ║"
+  echo "╚══════════════════════════════════════════════╝"
+  echo -e "${NC}"
+  echo -e "  Host: ${CYAN}$(hostname -s)${NC}    PostgreSQL: $(pg_status)"
+  echo -e "${DIM}  ────────────────────────────────────────────${NC}${BOLD}"
+  echo -e "   ${GREEN}1${NC})  Backup a database"
+  echo -e "   ${GREEN}2${NC})  Restore a database"
+  echo -e "   ${GREEN}3${NC})  Create database + user"
+  echo -e "   ${RED}4${NC})  Drop a database"
+  echo -e "   ${CYAN}5${NC})  Health check"
+  echo -e "   ${CYAN}6${NC})  Security check"
+  echo -e "   ${YELLOW}7${NC})  List databases"
+  echo -e "   ${YELLOW}8${NC})  List backups"
+  echo -e "   ${DIM}0${NC})  Exit"
+  echo -e "${DIM}  ────────────────────────────────────────────${NC}"
+}
+
+# ── Run a script and pause ────────────────────────────────
+run_and_pause() {
+  echo ""
+  "$@"
+  echo ""
+  echo -e "${DIM}── Press Enter to return to the menu ──${NC}"
+  read -r
+}
+
+# ── Main loop ─────────────────────────────────────────────
+while true; do
+  draw_menu
+  read -p "$(echo -e "${BOLD} Select> ${NC}")" CHOICE
+
+  case "$CHOICE" in
+    1) run_and_pause "$BIN/pg-backup.sh" ;;
+    2) run_and_pause "$BIN/pg-restore.sh" ;;
+    3) run_and_pause "$BIN/pg-create-db.sh" ;;
+    4) run_and_pause "$BIN/pg-drop-db.sh" ;;
+    5) run_and_pause "$BIN/health-check.sh" ;;
+    6) run_and_pause "$BIN/security-check.sh" ;;
+    7) run_and_pause sudo -u postgres psql -c "\l+" ;;
+    8) run_and_pause ls -lh /var/backups/postgresql/ ;;
+    0) echo -e "${GREEN}Bye 👋${NC}"; exit 0 ;;
+    *) echo -e "${RED}Invalid choice${NC}"; sleep 1 ;;
+  esac
+done
+```
+
+### Usage
+
+```bash
+# Launch the menu
+sudo pg-manage.sh
+
+# Then type a number and press Enter:
+#   1  → runs pg-backup.sh
+#   4  → runs pg-drop-db.sh   (drop, with its own safety prompts)
+#   0  → exit
+```
+
+Each option simply calls the underlying script, so all existing prompts, confirmations, and safety backups still apply — the menu is just a friendlier front door. After an action finishes, press **Enter** to return to the menu.
+
+### Features
+
+- ✅ Single entry point for all six scripts
+- ✅ Colored, boxed menu with live PostgreSQL status in the header
+- ✅ Extra shortcuts: list databases (`\l+`), list backups
+- ✅ Requires `sudo` (checks `EUID`) and warns if run as a normal user
+- ✅ Pure bash — no `dialog`/`whiptail`/extra packages
+- ✅ Delegates to each script unchanged, so all safety prompts remain
+
+---
+
 ## Cron Schedule Summary
 
 ```bash
@@ -1525,6 +1931,7 @@ sudo cat -A /etc/security-check.env
 |-----|---------|
 | Backup logs | `/var/log/pg-backup.log` |
 | Database creation logs | `/var/log/pg-create-db.log` |
+| Database drop logs | `/var/log/pg-drop-db.log` |
 | Health check logs | `/var/log/health-check.log` |
 | Security check logs | `/var/log/security-check.log` |
 | Backup files | `/var/backups/postgresql/` |
@@ -1534,6 +1941,9 @@ sudo cat -A /etc/security-check.env
 ## Quick Reference
 
 ```bash
+# Interactive menu for everything below
+sudo pg-manage.sh
+
 # Run backup now
 sudo pg-backup.sh
 
@@ -1542,6 +1952,9 @@ sudo pg-restore.sh
 
 # Create new database & user
 sudo pg-create-db.sh
+
+# Drop a database (safety backup taken first)
+sudo pg-drop-db.sh
 
 # Check server health
 sudo health-check.sh
@@ -1552,6 +1965,7 @@ sudo security-check.sh
 # View logs
 tail -50 /var/log/pg-backup.log
 tail -50 /var/log/pg-create-db.log
+tail -50 /var/log/pg-drop-db.log
 tail -50 /var/log/health-check.log
 tail -50 /var/log/security-check.log
 

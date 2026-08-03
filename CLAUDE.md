@@ -26,13 +26,15 @@ This is a documentation-only DevOps knowledge base — no application code, no b
 
 ## Server Management Scripts
 
-Five scripts are maintained at `/usr/local/bin/` on the Hetzner server:
+Seven scripts are maintained at `/usr/local/bin/` on the Hetzner server:
 
 | Script | Purpose |
 |---|---|
+| `pg-manage.sh` | Interactive colored-menu launcher for all scripts below |
 | `pg-backup.sh` | Daily automated PostgreSQL backup with retention |
 | `pg-restore.sh` | Restore from a backup file |
 | `pg-create-db.sh` | Create a new database and user |
+| `pg-drop-db.sh` | Drop a database (and optional role) with a forced safety backup |
 | `health-check.sh` | Server resource and service health report |
 | `security-check.sh` | Security posture audit |
 
@@ -40,7 +42,7 @@ Full script contents and setup instructions: [`Instructions/server-management-sc
 
 ## PostgreSQL Remote Access
 
-Direct remote access is IP-allowlisted via `pg_hba.conf` + UFW. When adding a new client IP, both must be updated and PostgreSQL restarted. SSH tunnel alternative is documented for removing direct access.
+Direct remote access is IP-allowlisted at two layers: `pg_hba.conf` (Postgres) + the Hetzner cloud firewall (network). When adding a new client IP, both must be updated and PostgreSQL restarted. SSH tunnel alternative is documented for removing direct access.
 
 See [`Instructions/postgresql-remote-access-hetzner.md`](Instructions/postgresql-remote-access-hetzner.md)
 

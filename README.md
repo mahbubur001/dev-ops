@@ -49,7 +49,7 @@
 
 | Guide | Description |
 |---|---|
-| [Remote Access — Hetzner](Instructions/postgresql-remote-access-hetzner.md) | IP allowlist via `pg_hba.conf` + UFW, SSH tunnel fallback, status checks |
+| [Remote Access — Hetzner](Instructions/postgresql-remote-access-hetzner.md) | Two-layer allowlist: `pg_hba.conf` + Hetzner cloud firewall, SSH tunnel fallback, status checks |
 
 ---
 
@@ -65,15 +65,17 @@
 
 | Guide | Description |
 |---|---|
-| [Server Management Scripts](Instructions/server-management-scripts.md) | All five `/usr/local/bin/` scripts — backup, restore, DB create, health check, security audit |
+| [Server Management Scripts](Instructions/server-management-scripts.md) | All `/usr/local/bin/` scripts — interactive menu, backup, restore, DB create, DB drop, health check, security audit |
 
 ### Scripts on Server
 
 ```
 /usr/local/bin/
+├── pg-manage.sh       ← interactive menu launcher for all scripts below
 ├── pg-backup.sh       ← daily database backup with retention
 ├── pg-restore.sh      ← restore from backup file
 ├── pg-create-db.sh    ← create new database + user
+├── pg-drop-db.sh      ← drop a database (+ optional role) with safety backup
 ├── health-check.sh    ← server resource & service report
 └── security-check.sh  ← security posture audit
 ```
@@ -83,6 +85,9 @@
 ## ⚡ Quick Reference
 
 ```bash
+# Interactive menu for all PG/server scripts
+sudo /usr/local/bin/pg-manage.sh
+
 # Check PostgreSQL status
 sudo systemctl status postgresql
 
@@ -95,8 +100,8 @@ sudo /usr/local/bin/pg-backup.sh
 # SSH tunnel (local port 5433 → remote 5432)
 ssh -L 5433:localhost:5432 deploy@<hetzner-ip> -N -C
 
-# View firewall rules
-sudo ufw status
+# Test remote DB access (which pg_hba path an app uses)
+PGPASSWORD='<pass>' psql -h <hetzner-ip> -U <user> -d <db> -c "SELECT current_user;"
 ```
 
 ---
