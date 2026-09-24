@@ -65,7 +65,7 @@
 
 | Guide | Description |
 |---|---|
-| [Server Management Scripts](Instructions/server-management-scripts.md) | All `/usr/local/bin/` scripts — interactive menu, backup, restore, DB create, DB drop, DB rename, health check, security audit |
+| [Server Management Scripts](Instructions/server-management-scripts.md) | All `/usr/local/bin/` scripts — interactive menu, backup, restore, DB create, DB drop, DB rename, export/download, health check, security audit |
 
 ### Scripts on Server
 
@@ -77,6 +77,7 @@
 ├── pg-create-db.sh    ← create new database + user
 ├── pg-drop-db.sh      ← drop a database (+ optional role) with safety backup
 ├── pg-rename.sh       ← rename a database and/or user with safety backup
+├── pg-export.sh       ← copy/create a dump into ~/downloads for SCP off the server
 ├── health-check.sh    ← server resource & service report
 └── security-check.sh  ← security posture audit
 ```
