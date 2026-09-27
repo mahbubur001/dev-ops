@@ -8,7 +8,9 @@
 
 - [Infrastructure Overview](#-infrastructure-overview)
 - [PostgreSQL Guides](#-postgresql-guides)
+- [Caching (Redis)](#-caching-redis)
 - [File Transfer](#-file-transfer)
+- [Application Deployment](#-application-deployment)
 - [Server Management](#-server-management)
 - [Quick Reference](#-quick-reference)
 
@@ -38,6 +40,7 @@
 | Guide | Description |
 |---|---|
 | [Migrate Database — Server to Server](Instructions/postgresql-migrate-server-to-server.md) | Dump & restore, direct stream, full cluster migration, verification steps |
+| [Migrate Database — Hetzner → AWS](Instructions/migrate-database-hetzner-to-aws.md) | Live DB move: `pg_dump -Fc` → laptop relay → `pg_restore`, re-grants, direct stream for large DBs |
 
 ### Backup & Recovery
 
@@ -53,6 +56,14 @@
 
 ---
 
+## 🧰 Caching (Redis)
+
+| Guide | Description |
+|---|---|
+| [Redis Setup & Hardening](Instructions/redis-setup.md) | Install, localhost-only bind, password (`requirepass`), memory cap, connection string, troubleshooting |
+
+---
+
 ## 📁 File Transfer
 
 | Guide | Description |
@@ -61,11 +72,36 @@
 
 ---
 
+## 🚀 Application Deployment
+
+| Guide | Stack | Description |
+|---|---|---|
+| [Deploy Node.js & Next.js Apps](Instructions/deploy-nodejs-nextjs-apps.md) | PM2 · Nginx · Certbot | Multiple Node/Next.js apps on one server — reverse proxy per domain, SSL, zero-downtime redeploys |
+
+**Scripts:** [`scripts/health-check-aws.sh`](scripts/health-check-aws.sh) — health monitor for the AWS box (resources, services, PM2, ports, SSL). SCP to `/usr/local/bin/health-check.sh`.
+
+---
+
 ## ⚙️ Server Management
+
+### Initial Setup
+
+| Guide | Platform | Description |
+|---|---|---|
+| [New Server Setup](Instructions/new-server-setup-aws-t3-medium.md) | AWS t3.medium | First-boot hardening — deploy user, SSH lockdown, UFW, swap, fail2ban, auto-updates, baseline tooling |
+
+### Monitoring & Alerts
 
 | Guide | Description |
 |---|---|
-| [Server Management Scripts](Instructions/server-management-scripts.md) | All `/usr/local/bin/` scripts — interactive menu, backup, restore, DB create, DB drop, DB rename, export/download, health check, security audit |
+| [Email Alerts via AWS SES](Instructions/aws-ses-email-alerts.md) | SES SMTP → `msmtp`/`sendmail` drop-in, `ALERT_EMAIL` env vars, wire into `security-check.sh` + cron, sandbox exit |
+
+### Scripts
+
+| Resource | Description |
+|---|---|
+| [Server Management Scripts (docs)](Instructions/server-management-scripts.md) | Full documentation + usage for all `/usr/local/bin/` scripts — interactive menu, backup, restore, DB create, DB drop, DB rename, export/download, health check, security audit |
+| [`scripts/`](scripts/) | Executable copies ready to SCP to a server — see [scripts/README.md](scripts/README.md) for install steps |
 
 ### Scripts on Server
 

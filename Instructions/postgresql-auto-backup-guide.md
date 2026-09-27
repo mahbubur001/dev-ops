@@ -31,7 +31,7 @@ sudo chown ubuntu:ubuntu /var/backups/postgresql
 ### Step 2: Create Backup Script
 
 ```bash
-sudo nano /usr/local/bin/backup-postgres.sh
+sudo vim /usr/local/bin/backup-postgres.sh
 ```
 
 **Paste this content:**
@@ -77,7 +77,7 @@ find $BACKUP_DIR -name "*.sql.gz" -mtime +$RETENTION_DAYS -delete
 echo "$(date): Backup process completed."
 ```
 
-**Save:** `Ctrl + O` → `Enter` → `Ctrl + X`
+**Save:** `Esc` → `:wq` → `Enter`
 
 ### Step 3: Make Script Executable
 
@@ -157,7 +157,7 @@ aws s3 mb s3://your-app-db-backups
 ### Step 4: Create Backup Script with S3 Upload
 
 ```bash
-sudo nano /usr/local/bin/backup-postgres-s3.sh
+sudo vim /usr/local/bin/backup-postgres-s3.sh
 ```
 
 **Paste this content:**
@@ -229,7 +229,7 @@ done
 echo "$(date): ✅ Backup process completed."
 ```
 
-**Save:** `Ctrl + O` → `Enter` → `Ctrl + X`
+**Save:** `Esc` → `:wq` → `Enter`
 
 ### Step 5: Make Executable and Test
 
@@ -259,7 +259,7 @@ sudo crontab -e
 ### Create Advanced Backup Script
 
 ```bash
-sudo nano /usr/local/bin/backup-postgres-advanced.sh
+sudo vim /usr/local/bin/backup-postgres-advanced.sh
 ```
 
 **Paste this content:**
@@ -325,7 +325,7 @@ find $BACKUP_DIR/monthly -name "*.sql.gz" -mtime +365 -delete  # Keep 365 days
 echo "$(date): ✅ Advanced backup completed."
 ```
 
-**Save:** `Ctrl + O` → `Enter` → `Ctrl + X`
+**Save:** `Esc` → `:wq` → `Enter`
 
 ### Make Executable and Schedule
 
@@ -443,7 +443,7 @@ sudo apt install mailutils -y
 ### Step 2: Create Backup Script with Email
 
 ```bash
-sudo nano /usr/local/bin/backup-postgres-email.sh
+sudo vim /usr/local/bin/backup-postgres-email.sh
 ```
 
 **Paste this content:**

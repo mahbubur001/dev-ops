@@ -163,7 +163,7 @@ exit
 ### 7.1 Edit Main Configuration
 
 ```bash
-sudo nano /etc/postgresql/18/main/postgresql.conf
+sudo vim /etc/postgresql/18/main/postgresql.conf
 ```
 
 **Find and update these settings:**
@@ -200,12 +200,12 @@ log_rotation_age = 1d
 log_min_duration_statement = 1000
 ```
 
-**Save:** `Ctrl + O` → `Enter` → `Ctrl + X`
+**Save:** `Esc` → `:wq` → `Enter`
 
 ### 7.2 Edit Authentication Configuration
 
 ```bash
-sudo nano /etc/postgresql/18/main/pg_hba.conf
+sudo vim /etc/postgresql/18/main/pg_hba.conf
 ```
 
 **Find and update to match:**
@@ -224,7 +224,7 @@ host    all             all             127.0.0.1/32            md5
 host    all             all             ::1/128                 md5
 ```
 
-**Save:** `Ctrl + O` → `Enter` → `Ctrl + X`
+**Save:** `Esc` → `:wq` → `Enter`
 
 ### 7.3 Restart PostgreSQL
 
@@ -347,7 +347,7 @@ SELECT pg_size_pretty(pg_database_size('directory_db'));
 ### 12.1 Create the Script
 
 ```bash
-sudo nano /usr/local/bin/backup-postgres.sh
+sudo vim /usr/local/bin/backup-postgres.sh
 ```
 
 **Paste this content:**
@@ -387,7 +387,7 @@ find $BACKUP_DIR -name "*.sql.gz" -mtime +$RETENTION_DAYS -delete
 echo "Old backups cleaned up (keeping last $RETENTION_DAYS days)"
 ```
 
-**Save:** `Ctrl + O` → `Enter` → `Ctrl + X`
+**Save:** `Esc` → `:wq` → `Enter`
 
 ### 12.2 Make Script Executable
 
