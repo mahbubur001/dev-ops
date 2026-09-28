@@ -429,6 +429,90 @@ pm2 start npm --name radiustask --max-memory-restart 400M -- start
 
 ---
 
+## Memory-Constrained (4GB) Builds
+
+On a t4g.medium/t3.medium (4GB), building Next.js **on the box** is right at the memory edge — worse when a second app + Postgres + Redis are already resident. Two failure modes and their fixes:
+
+### 1. Build gets OOM-killed (exit 137) or hangs
+
+Symptoms: `signal SIGKILL` / `exit code 137`, or the deploy sits for 20+ min swap-thrashing (`available` RAM drops near zero in `free -h`).
+
+- **Add swap** — 2GB is not enough; give it 6GB:
+  ```bash
+  sudo swapoff /swapfile && sudo rm /swapfile
+  sudo fallocate -l 6G /swapfile && sudo chmod 600 /swapfile
+  sudo mkswap /swapfile && sudo swapon /swapfile
+  ```
+- **Cap the heap** so Node GCs instead of ballooning (leaves room for PG/Redis):
+  ```bash
+  export NODE_OPTIONS="--max-old-space-size=2048"
+  ```
+- **Never build two apps at once.** Two concurrent `next build`s WILL OOM. Serialize deploys (own concurrency group per app in CI; don't hand-run two at once).
+
+### 2. Build compiles, then OOMs on "Running TypeScript"
+
+The `next build` type-check needs >2GB heap and hits the cap above. Types are already enforced in dev + PR CI, so skip the redundant on-server pass. Gate it in `next.config`:
+
+```js
+// next.config.js / .mjs
+typescript: {
+  ignoreBuildErrors: process.env.SKIP_TS_CHECK === '1',
+},
+```
+
+Then set the flag in the deploy step only:
+```bash
+export SKIP_TS_CHECK=1
+```
+
+This is per-server (the flag isn't set in dev/CI), so type safety is preserved everywhere it matters.
+
+### The real fix: build off-box
+
+On a 4GB box hosting multiple apps, the durable solution is to **build in the CI runner** (`build` → rsync `.next`/`dist` to the server) and have the server only `pm2 reload`. Deploys drop from ~20min swap-death to seconds, and the box never gets starved while serving traffic.
+
+---
+
+## pnpm: native build scripts blocked (v10+)
+
+pnpm v10+ **blocks dependency lifecycle scripts by default** — so Prisma engines, `bcrypt`, `sharp`, `esbuild` don't build and the app breaks at runtime:
+
+```
+Error: ERR_PNPM_IGNORED_BUILDS
+  × Ignored build scripts: @prisma/engines, bcrypt, esbuild, sharp, ...
+```
+
+Fix depends on pnpm major version — **the setting moved**:
+
+- **pnpm 10–11:** list in `pnpm-workspace.yaml`:
+  ```yaml
+  onlyBuiltDependencies:
+    - '@prisma/engines'
+    - sharp
+  ```
+- **pnpm 12+:** a map named `allowBuilds` (the old list is ignored, with a warning):
+  ```yaml
+  allowBuilds:
+    '@prisma/engines': true
+    bcrypt: true
+    core-js: true
+    esbuild: true
+    msgpackr-extract: true
+    prisma: true
+    sharp: true
+    unrs-resolver: true
+  ```
+
+Commit this to the repo so CI + every server behave the same. If deps are already installed, force the scripts to run:
+```bash
+pnpm install
+pnpm rebuild        # re-runs the now-approved build scripts
+```
+
+> Check the version first (`pnpm --version`) — using the wrong key silently does nothing. When unsure, `pnpm approve-builds` writes the correct format for the installed version.
+
+---
+
 ## Deployment Checklist
 
 - [ ] Node 22 installed

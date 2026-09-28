@@ -18,7 +18,9 @@ Move a live PostgreSQL database from the Hetzner server to the newly-provisioned
 4. [Restore on AWS](#step-4-restore-on-aws)
 5. [Verify the Import](#step-5-verify-the-import)
 6. [Large Databases (Direct Stream)](#large-databases-direct-stream)
-7. [Troubleshooting](#troubleshooting)
+7. [Alternative: Plain-SQL gzip](#alternative-plain-sql-gzip-sqlgz)
+8. [After the Import — Repoint the App](#after-the-import--repoint-the-app)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -165,7 +167,75 @@ ssh -i ~/dev/hetzner-key deploy@87.99.130.89 "sudo -u postgres pg_dump -Fc -d bi
 
 ---
 
+## Alternative: Plain-SQL gzip (`.sql.gz`)
+
+Custom format (`-Fc`) is preferred, but a gzip'd plain-SQL dump is fine and human-readable. **Caveat:** plain SQL embeds the source's `GRANT`/`ALTER ... OWNER TO <role>` statements — if the AWS role name differs, you'll get `role "..." does not exist` errors (see below).
+
+```bash
+# On Hetzner
+sudo -u postgres pg_dump radius_task | gzip > /tmp/radius_task_$(date +%Y%m%d).sql.gz
+
+# Relay via laptop
+scp "deploy@87.99.130.89:/tmp/radius_task_*.sql.gz" ~/Downloads/radius_task.sql.gz
+scp -i ~/dev/internal.pem ~/Downloads/radius_task.sql.gz deploy@13.201.18.86:/tmp/
+
+# On AWS — stop the app, then restore
+pm2 stop <app-processes>
+gunzip -c /tmp/radius_task.sql.gz | sudo -u postgres psql -d radius_task
+```
+
+To avoid the role-name problem entirely, prefer `-Fc` + `pg_restore --no-owner --no-privileges` (it ignores source roles).
+
+---
+
+## After the Import — Repoint the App
+
+A restored DB is useless if the app still points at the old host. Update the app's `.env` on AWS and restart with `--update-env` (PM2 caches env — a plain reload won't pick up `.env` changes):
+
+```bash
+vim /var/www/<app>/.env
+# DATABASE_URL=postgresql://<user>:<pass>@localhost:5432/<db>
+# REDIS_URL, NEXT_PUBLIC_APP_URL, callback URLs → new host
+
+pm2 restart <app-processes> --update-env
+```
+
+If the app 500s after import, it's almost always: wrong `DATABASE_URL` password, or a DB-user password that was never set on AWS:
+```bash
+sudo -u postgres psql -c "ALTER USER <user> WITH PASSWORD '<match-your-env>';"
+```
+
+---
+
 ## Troubleshooting
+
+### `role "<oldrole>" does not exist` (plain-SQL restore, different role name)
+
+The source used a different role (e.g. Hetzner `radius_task_user`, AWS `radius_task_u`). A plain-SQL dump's `ALTER ... OWNER TO`/`GRANT` lines then fail. Data tables still import; only ownership/grants don't.
+
+Fix — create the old role so the import resolves, hand ownership to the real user, then drop the old role:
+
+```bash
+# 1. Create the old role so OWNER/GRANT lines resolve
+sudo -u postgres psql -c "CREATE ROLE radius_task_user;"
+
+# 2. Fresh DB + clean re-import (no role errors now)
+sudo -u postgres psql -c "DROP DATABASE IF EXISTS radius_task;"
+sudo -u postgres psql -c "CREATE DATABASE radius_task OWNER radius_task_u;"
+gunzip -c /tmp/radius_task.sql.gz | sudo -u postgres psql -d radius_task
+
+# 3. Move ownership + privileges to the real app user
+sudo -u postgres psql -d radius_task -c "REASSIGN OWNED BY radius_task_user TO radius_task_u;"
+sudo -u postgres psql -d radius_task -c "DROP OWNED BY radius_task_user;"   # clears leftover grants/default-privs
+sudo -u postgres psql -c "DROP ROLE radius_task_user;"
+
+# 4. Re-grant
+sudo -u postgres psql -d radius_task -c "GRANT ALL ON SCHEMA public TO radius_task_u; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO radius_task_u; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO radius_task_u; ALTER SCHEMA public OWNER TO radius_task_u;"
+```
+
+> `DROP ROLE` fails with `cannot be dropped because some objects depend on it` if you skip `DROP OWNED BY` — `REASSIGN OWNED` moves object ownership but leaves grants/default-privileges behind. Run both.
+
+### `role "bikribdu" does not exist`
 
 ### `role "bikribdu" does not exist`
 

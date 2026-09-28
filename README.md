@@ -76,7 +76,8 @@
 
 | Guide | Stack | Description |
 |---|---|---|
-| [Deploy Node.js & Next.js Apps](Instructions/deploy-nodejs-nextjs-apps.md) | PM2 · Nginx · Certbot | Multiple Node/Next.js apps on one server — reverse proxy per domain, SSL, zero-downtime redeploys |
+| [Deploy Node.js & Next.js Apps](Instructions/deploy-nodejs-nextjs-apps.md) | PM2 · Nginx · Certbot | Multiple Node/Next.js apps on one server — reverse proxy per domain, SSL, zero-downtime redeploys, 4GB build tuning, pnpm native-build fix |
+| [Nginx Reverse Proxy + SSL Behind Cloudflare](Instructions/nginx-reverse-proxy-cloudflare.md) | Cloudflare · Nginx · Certbot | HTTP-only-first config, grey-cloud for Certbot, Full (strict), reusing a config from another server |
 
 **Scripts:** [`scripts/health-check-aws.sh`](scripts/health-check-aws.sh) — health monitor for the AWS box (resources, services, PM2, ports, SSL). SCP to `/usr/local/bin/health-check.sh`.
 
