@@ -2,6 +2,8 @@
 
 > A structured collection of server setup, database management, and automation guides.
 
+> 🗺️ **[Infrastructure Roadmap](ROADMAP.md)** — near-term hardening + long-term direction (Docker, managed DB, right-sizing) for the AWS box.
+
 ---
 
 ## 📋 Table of Contents
