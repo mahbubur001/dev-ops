@@ -2,7 +2,7 @@
 
 > A structured collection of server setup, database management, and automation guides.
 
-> 🗺️ **[Infrastructure Roadmap](ROADMAP.md)** — near-term hardening + long-term direction (Docker, managed DB, right-sizing) for the AWS box.
+> 🗺️ **[Infrastructure Roadmap — `internal-server`](ROADMAP-internal-server.md)** — near-term hardening + long-term direction (Docker, managed DB, right-sizing) for the AWS box.
 
 ---
 

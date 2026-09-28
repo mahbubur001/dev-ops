@@ -1,8 +1,8 @@
 [← Back to Home](README.md)
 
-# Infrastructure Roadmap
+# Infrastructure Roadmap — `internal-server`
 
-Forward-looking plan for the AWS box hosting **bikribd** + **radiustask**. Nothing here is urgent — the current setup works. This captures the hardening steps and the long-term direction so we can act when traffic or incidents justify it.
+Forward-looking plan for the AWS box (`internal-server`) hosting **bikribd** + **radiustask**. Nothing here is urgent — the current setup works. This captures the hardening steps and the long-term direction so we can act when traffic or incidents justify it.
 
 > **Status:** current setup left as-is (2026-09-28). Implement items below later, in priority order.
 
