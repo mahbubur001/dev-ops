@@ -206,11 +206,11 @@ sudo ufw status verbose
 
 ## Step 9: Add Swap Space
 
-t3.medium has only 4GB RAM. A 2GB swap file guards against OOM kills during builds.
+t3.medium has only 4GB RAM. An 8GB swap file guards against OOM kills during Node/pnpm builds, which are the main memory-pressure point on this box.
 
 ```bash
-# Create a 2GB swap file
-sudo fallocate -l 2G /swapfile
+# Create an 8GB swap file
+sudo fallocate -l 8G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
@@ -285,7 +285,7 @@ sudo apt install -y \
 ### Optional: Node.js (via NodeSource)
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt install -y nodejs
 node -v && npm -v
 ```

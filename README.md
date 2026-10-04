@@ -43,6 +43,7 @@
 |---|---|
 | [Migrate Database — Server to Server](Instructions/postgresql-migrate-server-to-server.md) | Dump & restore, direct stream, full cluster migration, verification steps |
 | [Migrate Database — Hetzner → AWS](Instructions/migrate-database-hetzner-to-aws.md) | Live DB move: `pg_dump -Fc` → laptop relay → `pg_restore`, re-grants, direct stream for large DBs |
+| [Migrate Database — AWS → AWS (PG17→18)](Instructions/migrate-database-aws-to-aws.md) | Gzip plain-SQL dump → laptop relay → restore via peer auth; interactive one-command script |
 
 ### Backup & Recovery
 

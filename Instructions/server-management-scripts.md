@@ -27,6 +27,50 @@ sudo chmod +x /usr/local/bin/{pg-backup,pg-restore,pg-create-db,pg-drop-db,pg-re
 
 ---
 
+## Bulk Deploy (no copy-paste)
+
+Instead of pasting each script by hand, extract them all from this guide into real `.sh` files and push them to the server in one shot.
+
+**1. Extract** — run this from the repo root; it reads every `**Location:**` marker below and writes the following ` ```bash ` block to `server-scripts/`:
+
+```bash
+python3 - <<'PY'
+import re, pathlib
+src = pathlib.Path("Instructions/server-management-scripts.md").read_text().splitlines()
+out = pathlib.Path("server-scripts"); out.mkdir(exist_ok=True)
+loc = re.compile(r'\*\*Location:\*\* `/usr/local/bin/([^`]+)`')
+i = 0
+while i < len(src):
+    m = loc.search(src[i])
+    if m:
+        name = m.group(1)
+        while i < len(src) and not src[i].startswith("```bash"): i += 1
+        i += 1
+        body = []
+        while i < len(src) and not src[i].startswith("```"):
+            body.append(src[i]); i += 1
+        (out / name).write_text("\n".join(body) + "\n")
+        print(f"  {name}")
+    i += 1
+PY
+```
+
+**2. Push + install** — copies to the server home, then moves into `/usr/local/bin/` with the executable bit set (one `install` call):
+
+```bash
+# Hetzner (key already in ssh-agent / ssh config)
+scp server-scripts/*.sh deploy@87.99.130.89:~/
+ssh deploy@87.99.130.89 'sudo install -m 755 ~/*.sh /usr/local/bin/ && rm ~/*.sh && ls -l /usr/local/bin/*.sh'
+
+# AWS (pass the .pem explicitly with -i on both commands)
+scp -i /path/to/your-key.pem server-scripts/*.sh deploy@34.229.145.66:~/
+ssh -i /path/to/your-key.pem deploy@34.229.145.66 'sudo install -m 755 ~/*.sh /usr/local/bin/ && rm ~/*.sh && ls -l /usr/local/bin/*.sh'
+```
+
+The `-i /path/to/your-key.pem` flag goes right after `scp`/`ssh`, before the source and host (e.g. `~/.ssh/aws-bikribd.pem`). Omit it when the key is already loaded in your ssh-agent.
+
+---
+
 ## 1. pg-backup.sh — Daily Database Backup
 
 **Location:** `/usr/local/bin/pg-backup.sh`
