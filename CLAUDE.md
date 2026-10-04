@@ -26,7 +26,7 @@ This is a documentation-only DevOps knowledge base — no application code, no b
 
 ## Server Management Scripts
 
-Eight scripts are maintained at `/usr/local/bin/` on the Hetzner server:
+Nine scripts are maintained at `/usr/local/bin/` on the Hetzner server:
 
 | Script | Purpose |
 |---|---|
@@ -36,6 +36,7 @@ Eight scripts are maintained at `/usr/local/bin/` on the Hetzner server:
 | `pg-create-db.sh` | Create a new database and user |
 | `pg-drop-db.sh` | Drop a database (and optional role) with a forced safety backup |
 | `pg-rename.sh` | Rename a database and/or user with a forced safety backup |
+| `pg-export.sh` | Copy/create a dump into `~/downloads/` for SCP off the server |
 | `health-check.sh` | Server resource and service health report |
 | `security-check.sh` | Security posture audit |
 

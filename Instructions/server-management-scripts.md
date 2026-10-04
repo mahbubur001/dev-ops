@@ -8,12 +8,13 @@
 ## Quick Setup
 
 ```bash
-# Create all seven scripts
+# Create all eight scripts
 sudo vim /usr/local/bin/pg-backup.sh
 sudo vim /usr/local/bin/pg-restore.sh
 sudo vim /usr/local/bin/pg-create-db.sh
 sudo vim /usr/local/bin/pg-drop-db.sh
 sudo vim /usr/local/bin/pg-rename.sh
+sudo vim /usr/local/bin/pg-export.sh
 sudo vim /usr/local/bin/health-check.sh
 sudo vim /usr/local/bin/security-check.sh
 
@@ -21,8 +22,52 @@ sudo vim /usr/local/bin/security-check.sh
 sudo vim /usr/local/bin/pg-manage.sh
 
 # Make all executable (one command)
-sudo chmod +x /usr/local/bin/{pg-backup,pg-restore,pg-create-db,pg-drop-db,pg-rename,health-check,security-check,pg-manage}.sh
+sudo chmod +x /usr/local/bin/{pg-backup,pg-restore,pg-create-db,pg-drop-db,pg-rename,pg-export,health-check,security-check,pg-manage}.sh
 ```
+
+---
+
+## Bulk Deploy (no copy-paste)
+
+Instead of pasting each script by hand, extract them all from this guide into real `.sh` files and push them to the server in one shot.
+
+**1. Extract** — run this from the repo root; it reads every `**Location:**` marker below and writes the following ` ```bash ` block to `server-scripts/`:
+
+```bash
+python3 - <<'PY'
+import re, pathlib
+src = pathlib.Path("Instructions/server-management-scripts.md").read_text().splitlines()
+out = pathlib.Path("server-scripts"); out.mkdir(exist_ok=True)
+loc = re.compile(r'\*\*Location:\*\* `/usr/local/bin/([^`]+)`')
+i = 0
+while i < len(src):
+    m = loc.search(src[i])
+    if m:
+        name = m.group(1)
+        while i < len(src) and not src[i].startswith("```bash"): i += 1
+        i += 1
+        body = []
+        while i < len(src) and not src[i].startswith("```"):
+            body.append(src[i]); i += 1
+        (out / name).write_text("\n".join(body) + "\n")
+        print(f"  {name}")
+    i += 1
+PY
+```
+
+**2. Push + install** — copies to the server home, then moves into `/usr/local/bin/` with the executable bit set (one `install` call):
+
+```bash
+# Hetzner (key already in ssh-agent / ssh config)
+scp server-scripts/*.sh deploy@87.99.130.89:~/
+ssh deploy@87.99.130.89 'sudo install -m 755 ~/*.sh /usr/local/bin/ && rm ~/*.sh && ls -l /usr/local/bin/*.sh'
+
+# AWS (pass the .pem explicitly with -i on both commands)
+scp -i /path/to/your-key.pem server-scripts/*.sh deploy@34.229.145.66:~/
+ssh -i /path/to/your-key.pem deploy@34.229.145.66 'sudo install -m 755 ~/*.sh /usr/local/bin/ && rm ~/*.sh && ls -l /usr/local/bin/*.sh'
+```
+
+The `-i /path/to/your-key.pem` flag goes right after `scp`/`ssh`, before the source and host (e.g. `~/.ssh/aws-bikribd.pem`). Omit it when the key is already loaded in your ssh-agent.
 
 ---
 
@@ -1417,7 +1462,297 @@ sudo pg-rename.sh -d old_app -D new_app -r old_user -R new_user -f
 
 ---
 
-## 6. health-check.sh — Server Health Monitor
+## 6. pg-export.sh — Export a Backup for Download
+
+**Location:** `/usr/local/bin/pg-export.sh`
+
+> Runs **on the server**. Puts a `.sql.gz` in your home `~/downloads/` (owned by you, not root) so you can `scp`/SFTP it to your Mac. Two modes: copy an **existing** nightly backup, or make a **fresh** dump on demand. It prints the exact `scp` command to run from your laptop.
+
+```bash
+#!/bin/bash
+
+# ── Colors ────────────────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# ── Config ────────────────────────────────────────────────
+BACKUP_DIR="/var/backups/postgresql"
+LOG_FILE="/var/log/pg-export.log"
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+
+# Land the file in the REAL user's home (not root's), so it's downloadable without sudo
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+[ -z "$REAL_HOME" ] && REAL_HOME="$HOME"
+EXPORT_DIR="${PG_EXPORT_DIR:-$REAL_HOME/downloads}"
+
+# ── Auto-detect the address you connected to ──────────────
+# SSH_CONNECTION = "<client_ip> <client_port> <server_ip> <server_port>".
+# server_ip is exactly what your client reached (private IP, VPN, or Tailscale
+# name all work) — the perfect scp target. sudo strips this var, but since we
+# run as root we can read it back from the login shell up the process tree.
+find_ssh_connection() {
+  [ -n "$SSH_CONNECTION" ] && { echo "$SSH_CONNECTION"; return; }
+  local pid=$PPID depth=0 val
+  while [ "${pid:-0}" -gt 1 ] && [ "$depth" -lt 8 ]; do
+    val=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^SSH_CONNECTION=//p')
+    [ -n "$val" ] && { echo "$val"; return; }
+    pid=$(awk '{print $4}' "/proc/$pid/stat" 2>/dev/null)
+    depth=$((depth+1))
+  done
+}
+SSH_CONN=$(find_ssh_connection)
+DET_HOST=$(echo "$SSH_CONN" | awk '{print $3}')
+DET_PORT=$(echo "$SSH_CONN" | awk '{print $4}')
+
+# Download hint uses the SAME user + host you SSH in with (no public IP needed).
+# Override any of these via env if you go through an alias / jump host.
+SSH_USER="${PG_EXPORT_SSH_USER:-$REAL_USER}"
+SSH_HOST="${PG_EXPORT_SSH_HOST:-${DET_HOST:-$(hostname -I 2>/dev/null | awk '{print $1}')}}"
+SSH_PORT="${PG_EXPORT_SSH_PORT:-${DET_PORT:-22}}"
+
+# ── Help ──────────────────────────────────────────────────
+show_help() {
+  echo -e "${BLUE}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  PostgreSQL Backup Exporter"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo -e "${NC}"
+  echo "Usage:"
+  echo "  sudo pg-export.sh [-m existing|new] [-d DB] [-f FILE] [-o OUTDIR]"
+  echo ""
+  echo "Options:"
+  echo "  -m    Mode: existing | new"
+  echo "  -d    Database name"
+  echo "  -f    Backup filename (existing mode; blank = latest)"
+  echo "  -o    Output dir (default $EXPORT_DIR)"
+  echo "  -h    Show this help"
+  echo ""
+  echo "Examples:"
+  echo "  # Interactive"
+  echo "  sudo pg-export.sh"
+  echo ""
+  echo "  # Copy the latest existing backup of 'bikribd' to ~/downloads"
+  echo "  sudo pg-export.sh -m existing -d bikribd"
+  echo ""
+  echo "  # Make a fresh dump of 'bikribd' into ~/downloads"
+  echo "  sudo pg-export.sh -m new -d bikribd"
+}
+
+# ── Pick from a list (items on stdin) ─────────────────────
+pick_from() {
+  local PROMPT=$1
+  local -a ITEMS=()
+  while IFS= read -r line; do [ -n "$line" ] && ITEMS+=("$line"); done
+  if [ ${#ITEMS[@]} -eq 0 ]; then
+    echo -e "${RED}❌ Nothing to choose from${NC}" >&2
+    return 1
+  fi
+  local i=1
+  for it in "${ITEMS[@]}"; do
+    echo -e "  ${YELLOW}[$i]${NC} $(basename "$it")" >&2
+    i=$((i+1))
+  done
+  local SEL
+  read -p "$PROMPT " SEL </dev/tty
+  if ! [[ "$SEL" =~ ^[0-9]+$ ]] || [ "$SEL" -lt 1 ] || [ "$SEL" -gt ${#ITEMS[@]} ]; then
+    echo -e "${RED}❌ Invalid selection${NC}" >&2
+    return 1
+  fi
+  echo "${ITEMS[$((SEL-1))]}"
+}
+
+# ── Finalize: chown to the real user + print download hint ─
+finish() {
+  local OUT=$1
+  chown "$REAL_USER":"$REAL_USER" "$OUT" 2>/dev/null
+  local SIZE=$(du -h "$OUT" | cut -f1)
+  echo -e "${GREEN}✅ Ready: $OUT ($SIZE)${NC}"
+  echo "[$DATE] ✅ Exported: $OUT ($SIZE)" >> "$LOG_FILE"
+  local FNAME=$(basename "$OUT")
+  local RELDIR=${EXPORT_DIR#"$REAL_HOME/"}   # path relative to home for the scp hint
+  echo ""
+  echo -e "${CYAN}Download it from your Mac — use the SAME user + host you SSH in with:${NC}"
+  echo -e "  scp -P $SSH_PORT ${SSH_USER}@${SSH_HOST:-<your-ssh-host>}:$RELDIR/$FNAME ."
+  echo ""
+  echo -e "${YELLOW}If you connect via an SSH config alias, VPN, Tailscale, or jump host,${NC}"
+  echo -e "${YELLOW}use that instead — no public IP required. Examples:${NC}"
+  echo -e "  ${YELLOW}# using your ~/.ssh/config alias (e.g. 'Host hetzner')${NC}"
+  echo -e "  scp hetzner:$RELDIR/$FNAME ."
+  echo -e "  ${YELLOW}# via a jump/bastion host${NC}"
+  echo -e "  scp -J bastion ${SSH_USER}@${SSH_HOST:-<internal-host>}:$RELDIR/$FNAME ."
+}
+
+# ── Export an existing backup file ────────────────────────
+export_existing() {
+  local DB=$1
+  local FILE=$2
+
+  if [ -z "$DB" ]; then
+    echo -e "${CYAN}Databases with backups:${NC}"
+    DB=$(ls -1 "$BACKUP_DIR" 2>/dev/null | pick_from "Select database number:") || exit 1
+    DB=$(basename "$DB")
+  fi
+
+  local SRC
+  if [ -n "$FILE" ]; then
+    SRC="$BACKUP_DIR/$DB/$FILE"
+  else
+    echo -e "${CYAN}Backups for '$DB' (newest first):${NC}"
+    SRC=$(ls -1t "$BACKUP_DIR/$DB"/*.sql.gz 2>/dev/null | pick_from "Select backup number:") || exit 1
+  fi
+
+  if [ ! -f "$SRC" ]; then
+    echo -e "${RED}❌ Backup file not found: $SRC${NC}"
+    exit 1
+  fi
+
+  mkdir -p "$EXPORT_DIR"
+  local OUT="$EXPORT_DIR/$(basename "$SRC")"
+  echo -e "${BLUE}🔄 Copying to $EXPORT_DIR ...${NC}"
+  cp "$SRC" "$OUT" || { echo -e "${RED}❌ Copy failed${NC}"; exit 1; }
+  finish "$OUT"
+}
+
+# ── Create a fresh dump ───────────────────────────────────
+export_new() {
+  local DB=$1
+
+  if [ -z "$DB" ]; then
+    echo -e "${CYAN}Live databases:${NC}"
+    local DBS
+    DBS=$(sudo -u postgres psql -t -c "SELECT datname FROM pg_database WHERE datistemplate=false AND datname!='postgres';" 2>/dev/null | tr -d ' ' | grep -v '^$')
+    DB=$(echo "$DBS" | pick_from "Select database number:") || exit 1
+  fi
+
+  mkdir -p "$EXPORT_DIR"
+  local OUT="$EXPORT_DIR/${DB}_${DATE}.sql.gz"
+  echo -e "${BLUE}🔄 Dumping '$DB' → $OUT ...${NC}"
+  sudo -u postgres pg_dump "$DB" 2>/dev/null | gzip > "$OUT"
+  if [ "${PIPESTATUS[0]}" -eq 0 ] && [ -s "$OUT" ]; then
+    finish "$OUT"
+  else
+    echo -e "${RED}❌ Dump failed (does '$DB' exist?)${NC}"
+    rm -f "$OUT"
+    exit 1
+  fi
+}
+
+# ── Interactive mode ──────────────────────────────────────
+interactive_mode() {
+  echo -e "${BLUE}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "  PostgreSQL Backup Exporter"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo -e "${NC}"
+  echo -e "  Export dir: ${CYAN}$EXPORT_DIR${NC}"
+  echo ""
+  echo -e "  ${YELLOW}1${NC}) Copy an existing backup file"
+  echo -e "  ${YELLOW}2${NC}) Create a new dump"
+  echo ""
+  read -p "Select (1/2): " CHOICE </dev/tty
+  case "$CHOICE" in
+    1) export_existing "" "" ;;
+    2) export_new "" ;;
+    *) echo -e "${RED}❌ Invalid choice${NC}"; exit 1 ;;
+  esac
+}
+
+# ── Parse args ────────────────────────────────────────────
+MODE=""
+DB=""
+FILE=""
+
+while getopts "m:d:f:o:h" opt; do
+  case $opt in
+    m) MODE="$OPTARG" ;;
+    d) DB="$OPTARG" ;;
+    f) FILE="$OPTARG" ;;
+    o) EXPORT_DIR="$OPTARG" ;;
+    h) show_help; exit 0 ;;
+    *) show_help; exit 1 ;;
+  esac
+done
+
+# ── Main ──────────────────────────────────────────────────
+if [ -z "$MODE" ]; then
+  interactive_mode
+  exit 0
+fi
+
+case "$MODE" in
+  existing) export_existing "$DB" "$FILE" ;;
+  new)      export_new "$DB" ;;
+  *) echo -e "${RED}❌ Invalid mode: $MODE (use existing|new)${NC}"; exit 1 ;;
+esac
+```
+
+### Usage
+
+```bash
+# Interactive (recommended)
+sudo pg-export.sh
+
+# Copy the latest existing backup of bikribd → ~/downloads
+sudo pg-export.sh -m existing -d bikribd
+
+# Copy a specific backup file
+sudo pg-export.sh -m existing -d bikribd -f backup_2026-09-24_02-00-00.sql.gz
+
+# Make a fresh dump → ~/downloads
+sudo pg-export.sh -m new -d bikribd
+
+# Custom output directory
+sudo pg-export.sh -m new -d bikribd -o /tmp
+```
+
+Then, **from your Mac**, run the `scp` line the script prints. It uses the **same user + host you already SSH in with** — no public IP required:
+
+```bash
+# whatever you type after `ssh` to reach the server, use the same here:
+scp develop@<your-ssh-host>:downloads/bikribd_2026-09-24_14-00-00.sql.gz .
+
+# using an ~/.ssh/config alias instead:
+scp hetzner:downloads/bikribd_2026-09-24_14-00-00.sql.gz .
+
+# via a jump/bastion host:
+scp -J bastion develop@<internal-host>:downloads/bikribd_2026-09-24_14-00-00.sql.gz .
+```
+
+**No public IP?** No problem — the script **auto-detects** the address your SSH client reached (from `SSH_CONNECTION`) and prints the matching `scp` command, even under plain `sudo`. That address is whatever you connected to (private LAN IP, VPN, or Tailscale name), so it's already reachable from your Mac.
+
+Only override if you connect through an **SSH-config alias** or a **jump host** (where the detected internal IP isn't directly reachable):
+
+```bash
+# on the server, before running pg-export.sh:
+export PG_EXPORT_SSH_USER=develop
+export PG_EXPORT_SSH_HOST=hetzner        # your ~/.ssh/config alias
+sudo -E pg-export.sh                      # -E keeps your env under sudo
+```
+
+### Features
+
+- ✅ Runs on the server; drops the file in `~/downloads/` (or `-o` dir)
+- ✅ `chown`s the file to **your** user (`$SUDO_USER`) so you can `scp` it without sudo
+- ✅ Two modes: copy an existing nightly backup, or create a fresh dump
+- ✅ Interactive pickers for database and backup file
+- ✅ Prints the ready-to-paste `scp` download command
+- ✅ Logging to `/var/log/pg-export.log`
+
+### What it does
+
+1. Resolves your real (non-sudo) user and home to pick the export dir
+2. **Existing mode:** lists DB backup folders, then the `.sql.gz` files (newest first), and copies your pick
+3. **New mode:** lists live databases, runs `sudo -u postgres pg_dump <db> | gzip` into the export dir
+4. `chown`s the file to you and prints the `scp` command to pull it to your Mac
+
+---
+
+## 7. health-check.sh — Server Health Monitor
 
 **Location:** `/usr/local/bin/health-check.sh`
 
@@ -1675,7 +2010,7 @@ sudo health-check.sh
 
 ---
 
-## 7. security-check.sh — Security Monitor with Email Alerts
+## 8. security-check.sh — Security Monitor with Email Alerts
 
 **Location:** `/usr/local/bin/security-check.sh`
 
@@ -2215,7 +2550,7 @@ tail -50 /var/log/security-check.log
 
 ---
 
-## 8. pg-manage.sh — Interactive Menu Launcher
+## 9. pg-manage.sh — Interactive Menu Launcher
 
 **Location:** `/usr/local/bin/pg-manage.sh`
 
@@ -2266,10 +2601,11 @@ draw_menu() {
   echo -e "   ${GREEN}3${NC})  Create database + user"
   echo -e "   ${RED}4${NC})  Drop a database"
   echo -e "   ${YELLOW}5${NC})  Rename database / user"
-  echo -e "   ${CYAN}6${NC})  Health check"
-  echo -e "   ${CYAN}7${NC})  Security check"
-  echo -e "   ${YELLOW}8${NC})  List databases"
-  echo -e "   ${YELLOW}9${NC})  List backups"
+  echo -e "   ${GREEN}6${NC})  Export / download a backup"
+  echo -e "   ${CYAN}7${NC})  Health check"
+  echo -e "   ${CYAN}8${NC})  Security check"
+  echo -e "   ${YELLOW}9${NC})  List databases"
+  echo -e "   ${YELLOW}10${NC}) List backups"
   echo -e "   ${DIM}0${NC})  Exit"
   echo -e "${DIM}  ────────────────────────────────────────────${NC}"
 }
@@ -2294,10 +2630,11 @@ while true; do
     3) run_and_pause "$BIN/pg-create-db.sh" ;;
     4) run_and_pause "$BIN/pg-drop-db.sh" ;;
     5) run_and_pause "$BIN/pg-rename.sh" ;;
-    6) run_and_pause "$BIN/health-check.sh" ;;
-    7) run_and_pause "$BIN/security-check.sh" ;;
-    8) run_and_pause sudo -u postgres psql -c "\l+" ;;
-    9) run_and_pause ls -lh /var/backups/postgresql/ ;;
+    6) run_and_pause "$BIN/pg-export.sh" ;;
+    7) run_and_pause "$BIN/health-check.sh" ;;
+    8) run_and_pause "$BIN/security-check.sh" ;;
+    9) run_and_pause sudo -u postgres psql -c "\l+" ;;
+    10) run_and_pause ls -lh /var/backups/postgresql/ ;;
     0) echo -e "${GREEN}Bye 👋${NC}"; exit 0 ;;
     *) echo -e "${RED}Invalid choice${NC}"; sleep 1 ;;
   esac
@@ -2371,6 +2708,7 @@ sudo cat -A /etc/security-check.env
 | Database creation logs | `/var/log/pg-create-db.log` |
 | Database drop logs | `/var/log/pg-drop-db.log` |
 | Database rename logs | `/var/log/pg-rename.log` |
+| Backup export logs | `/var/log/pg-export.log` |
 | Health check logs | `/var/log/health-check.log` |
 | Security check logs | `/var/log/security-check.log` |
 | Backup files | `/var/backups/postgresql/` |
@@ -2398,6 +2736,9 @@ sudo pg-drop-db.sh
 # Rename a database and/or user (safety backup taken first)
 sudo pg-rename.sh
 
+# Export a backup to ~/downloads for SCP off the server
+sudo pg-export.sh
+
 # Check server health
 sudo health-check.sh
 
@@ -2409,6 +2750,7 @@ tail -50 /var/log/pg-backup.log
 tail -50 /var/log/pg-create-db.log
 tail -50 /var/log/pg-drop-db.log
 tail -50 /var/log/pg-rename.log
+tail -50 /var/log/pg-export.log
 tail -50 /var/log/health-check.log
 tail -50 /var/log/security-check.log
 
